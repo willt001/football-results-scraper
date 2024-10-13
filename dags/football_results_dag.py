@@ -20,7 +20,6 @@ def football_results_etl():
         fixture_dates = date_range(start_date, end_date)
         for fixture_date in fixture_dates:
             scrape_results(fixture_date=fixture_date, output_root_path=f'{ti.dag_id}_{ti.execution_date.date()}')
-        return f'{ti.dag_id}_{ti.execution_date.date()}'
         
     @task
     def get_s3_kwargs(ti=None):
