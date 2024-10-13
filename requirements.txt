@@ -1,2 +1,3 @@
 curl_cffi
 pydantic
+apache-airflow-providers-amazon

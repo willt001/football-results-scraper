@@ -1,2 +1,5 @@
 /.venv
 /results
+/config
+/logs
+/plugins

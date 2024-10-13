@@ -1,0 +1,1 @@
+BUCKET_NAME = 'football-results-raw-041'

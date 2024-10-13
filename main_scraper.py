@@ -13,6 +13,7 @@ class MatchResult(BaseModel):
     teams: list
     venue: dict
     status: dict
+    attnd: str
     atVs: dict
 
 def new_session() -> requests.Session:
@@ -39,17 +40,17 @@ def results_api(session: requests.Session, fixture_date: date) -> List[MatchResu
 
 def dump_results(results: List[MatchResult], fixture_date: date, output_root_path: str = './results') -> None:
     datenum = fixture_date.strftime('%Y%m%d')
-    filepath = f'{output_root_path}/d={datenum}/'
+    filepath = f'{output_root_path}/d={datenum}'
     if not os.path.exists(filepath):
         os.makedirs(filepath)
-    with open(f'{filepath}results.json', 'w') as f:
+    with open(f'{filepath}/results.json', 'w') as f:
         for result in results:
             json.dump(result.model_dump(), f)
             f.write('\n')
 
 if __name__ == "__main__":
     session = new_session()
-    start_date, end_date = date(2024, 1, 1), date(2024, 1, 7)
+    start_date, end_date = date(2024, 1, 8), date(2024, 1, 8)
     fixture_dates = date_range(start_date, end_date)
     for fixture_date in fixture_dates:
         results = results_api(session=session, fixture_date=fixture_date)
