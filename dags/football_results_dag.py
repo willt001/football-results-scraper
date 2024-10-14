@@ -7,7 +7,7 @@ from constants import BUCKET_NAME
 import os
 
 @dag(
-    start_date=datetime(2024, 10, 7),
+    start_date=datetime(2024, 9, 1),
     schedule_interval='@weekly',
     catchup=False
 )
@@ -15,8 +15,8 @@ def football_results_etl():
 
     @task
     def extract_results(ti=None):
-        end_date = ti.execution_date.date()
-        start_date = end_date - timedelta(6)
+        start_date = ti.execution_date.date() + timedelta(1)
+        end_date = ti.execution_date.date() + timedelta(7)
         fixture_dates = date_range(start_date, end_date)
         for fixture_date in fixture_dates:
             scrape_results(fixture_date=fixture_date, output_root_path=f'{ti.dag_id}_{ti.execution_date.date()}')
@@ -48,7 +48,8 @@ def football_results_etl():
             replace=True
         )
         local_to_s3.execute(context)
-                                                    
-    extract_results() >> upload_to_s3.expand(kwargs=get_s3_kwargs()) >> delete_local_directory()
+
+    kwargs = get_s3_kwargs()                                                
+    extract_results() >> kwargs >> upload_to_s3.expand(kwargs=kwargs) >> delete_local_directory()
     
 football_results_etl()
