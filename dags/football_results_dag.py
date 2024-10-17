@@ -3,6 +3,7 @@ from pendulum import datetime
 from datetime import timedelta
 from scraper import scrape_results, date_range
 from airflow.providers.amazon.aws.transfers.local_to_s3 import LocalFilesystemToS3Operator
+from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
 from constants import BUCKET_NAME
 import os
 
@@ -49,7 +50,19 @@ def football_results_etl():
         )
         local_to_s3.execute(context)
 
+    submit_glue_job = GlueJobOperator(
+        task_id='submit_glue_job',
+        job_name='transform-results',
+        aws_conn_id='aws_access',
+        region_name='eu-north-1',
+        script_args={
+            '--BUCKET_NAME': BUCKET_NAME,
+            '--START_DATE': '{{ (execution_date + macros.timedelta(1)).date() }}',
+            '--END_DATE': '{{ (execution_date + macros.timedelta(7)).date() }}',
+        }
+    )
+
     kwargs = get_s3_kwargs()                                                
-    extract_results() >> kwargs >> upload_to_s3.expand(kwargs=kwargs) >> delete_local_directory()
+    extract_results() >> kwargs >> upload_to_s3.expand(kwargs=kwargs) >> [delete_local_directory(), submit_glue_job]
     
 football_results_etl()
