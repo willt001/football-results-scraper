@@ -43,4 +43,26 @@ docker compose up -d --build
 
 ![image](https://github.com/user-attachments/assets/f052a8c7-1956-47f2-b680-afe192912db6)
 
-The Glue Crawler DAG will get run after the ETL DAG finishes (if no failures). This is responsible for updating the data catalog so that the data can be used in other services such as AWS Athena.
+The Glue Crawler DAG will get run after the ETL DAG finishes (if no failures). This is responsible for updating the data catalog so that the data can be used in other services such as AWS Athena, for example:
+
+```bash
+select
+    fixture_date,
+    league_name,
+    flag_cancelled,
+    home_team,
+    home_score,
+    away_team,
+    away_score,
+    final_score,
+    attendance,
+    venue_name,
+    country
+from 
+    football_results 
+where 
+    weekstarting >= 20241001
+limit 10
+```
+![image](https://github.com/user-attachments/assets/7b106ccc-5694-4b3e-8a2e-4698e0ab726a)
+
