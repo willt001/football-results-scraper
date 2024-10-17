@@ -15,6 +15,7 @@ class MatchResult(BaseModel):
     status: dict
     attnd: str
     atVs: dict
+    tableCaption: str
 
 def new_session() -> requests.Session:
     session = requests.Session(impersonate="chrome")
@@ -50,7 +51,7 @@ def dump_results(results: List[MatchResult], fixture_date: date, output_root_pat
 
 if __name__ == "__main__":
     session = new_session()
-    start_date, end_date = date(2024, 1, 8), date(2024, 1, 8)
+    start_date, end_date = date(2024, 10, 12), date(2024, 10, 13)
     fixture_dates = date_range(start_date, end_date)
     for fixture_date in fixture_dates:
         results = results_api(session=session, fixture_date=fixture_date)

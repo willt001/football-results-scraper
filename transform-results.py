@@ -30,7 +30,6 @@ filenames = [f'{source_s3_path}/d={fixture_date.strftime("%Y%m%d")}/results.json
 df = spark.read.json(filenames)
 df = df.withColumn('fixture_date', col('date').cast('date'))\
        .withColumn('attendance', col('attnd').cast('int'))\
-       .withColumn('final_score', col('atVs')['atVsText'])\
        .withColumn('espn_match_id', col('id').cast('int'))\
        .withColumn('home_team_struct', col('teams').getItem(0))\
        .withColumn('away_team_struct', col('teams').getItem(1))\
@@ -44,12 +43,14 @@ df = df.withColumn('fixture_date', col('date').cast('date'))\
        .withColumn('away_score', col('away_team_struct')['score'])\
        .withColumn('away_team_short', col('away_team_struct')['shortName'])\
        .withColumn('away_logo', col('away_team_struct')['logo'])\
+       .withColumn('league_name', col('tableCaption'))\
        .withColumn('venue_name', col('venue')['fullName'])\
        .withColumn('venue_id', col('venue')['id'].cast('int'))\
        .withColumn('city', col('venue')['address']['city'])\
        .withColumn('country', col('venue')['address']['country'])\
        .withColumn('match_status', col('status')['detail'])\
-       .withColumn('flag_cancelled', when(col('match_status') == 'Canceled', 1).otherwise(0))\
+       .withColumn('flag_cancelled', when(col('match_status') == 'Canceled', 1).when(col('match_status') == 'Postponed', 1).otherwise(0))\
+       .withColumn('final_score', when(col('flag_cancelled') == 0, None).otherwise(col('atVs')['atVsText']))\
        .select([
            'fixture_date', 
            'attendance', 
@@ -65,6 +66,7 @@ df = df.withColumn('fixture_date', col('date').cast('date'))\
            'away_score',
            'away_team_short',
            'away_logo',
+           'league_name',
            'venue_name',
            'venue_id',
            'city',

@@ -15,6 +15,7 @@ class MatchResult(BaseModel):
     status: dict
     attnd: str
     atVs: dict
+    tableCaption: str
 
 def new_session() -> requests.Session:
     session = requests.Session(impersonate="chrome")
