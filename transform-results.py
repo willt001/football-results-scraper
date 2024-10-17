@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pyspark.sql.functions import col, when
 
 
-## @params: [JOB_NAME]
+## This is the AWS Glue script which we submit parameters to with the GlueJobOperator in Airflow 
 args = getResolvedOptions(sys.argv, ['JOB_NAME', 'BUCKET_NAME', 'START_DATE', 'END_DATE'])
 
 sc = SparkContext()
@@ -24,6 +24,7 @@ output_s3_path = source_s3_path.replace('-raw-', '-transformed-') + f'/weekstart
 
 no_of_days = (end_date - start_date).days + 1
 fixture_dates = [start_date + timedelta(i) for i in range(no_of_days)]
+# Only read partitions for the date interval specified.
 filenames = [f'{source_s3_path}/d={fixture_date.strftime("%Y%m%d")}/results.json' for fixture_date in fixture_dates]
 
 df = spark.read.json(filenames)
