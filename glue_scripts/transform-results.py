@@ -69,8 +69,8 @@ def run_transformations(df: DataFrame) -> DataFrame:
     df = df.withColumn('fixture_date', col('date').cast('date'))\
        .withColumn('attendance', regexp_replace('attnd', ',', '').cast('int'))\
        .withColumn('espn_match_id', col('id').cast('int'))\
-       .withColumn('home_team_struct', when(size(col('teams')) > 1, col('teams').getItem(0)).otherwise(None))\
-       .withColumn('away_team_struct', when(size(col('teams')) > 1, col('teams').getItem(1)).otherwise(None))\
+       .withColumn('home_team_struct', when(size(col('teams')) > 1, col('teams').getItem(1)).otherwise(None))\
+       .withColumn('away_team_struct', when(size(col('teams')) > 1, col('teams').getItem(0)).otherwise(None))\
        .withColumn('home_team', col('home_team_struct')['displayName'])\
        .withColumn('home_team_abbrev', col('home_team_struct')['abbrev'])\
        .withColumn('home_score', col('home_team_struct')['score'])\
