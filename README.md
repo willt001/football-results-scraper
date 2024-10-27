@@ -64,5 +64,6 @@ where
     weekstarting >= 20241001
 limit 10
 ```
-![image](https://github.com/user-attachments/assets/7b106ccc-5694-4b3e-8a2e-4698e0ab726a)
+![image](https://github.com/user-attachments/assets/1ae58618-fc39-4042-9fba-9debc97befd6)
+
 
