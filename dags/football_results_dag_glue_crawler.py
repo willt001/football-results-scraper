@@ -1,6 +1,6 @@
 from airflow.decorators import dag, task 
 import pendulum
-from datetime import timedelta
+from datetime import datetime
 from airflow.hooks.base import BaseHook
 import boto3
 from constants import REGION_NAME, GLUE_CRAWLER_CONFIG
@@ -12,8 +12,8 @@ import json
 glue_crawler_config = json.loads(GLUE_CRAWLER_CONFIG)
 
 @dag(
-    start_date=pendulum.datetime(2024, 9, 1, 1),
-    schedule_interval=timedelta(7),
+    start_date=datetime(2024, 9, 2),
+    schedule_interval='5 0 * * 1',
     catchup=False,
     max_active_runs=1
     )

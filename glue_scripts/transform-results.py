@@ -1,38 +1,76 @@
 import sys
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
-from datetime import datetime, timedelta
-from pyspark.sql.functions import col, when
+from datetime import datetime, timedelta, date
+from pyspark.sql.functions import col, when, regexp_replace, size
 
 
-## This is the AWS Glue script which we submit parameters to with the GlueJobOperator in Airflow 
-args = getResolvedOptions(sys.argv, ['JOB_NAME', 'BUCKET_NAME', 'START_DATE', 'END_DATE'])
+def read_json_from_s3(spark: SparkSession, source_s3_path: str, start_date: date, end_date: date) -> DataFrame:
+    no_of_days = (end_date - start_date).days + 1
+    fixture_dates = [start_date + timedelta(i) for i in range(no_of_days)]
+    # Only read partitions for the date interval specified.
+    filenames = [f'{source_s3_path}/d={fixture_date.strftime("%Y%m%d")}/results.json' for fixture_date in fixture_dates]
+    return spark.read.json(filenames)
 
-sc = SparkContext()
-glueContext = GlueContext(sc)
-spark = glueContext.spark_session
-job = Job(glueContext)
-job.init(args['JOB_NAME'], args)
+def schema_check(df: DataFrame) -> None:
+    expected_columns = set([
+        'atVs', 
+        'attnd',
+        'competitors',
+        'date', 
+        'id', 
+        'link', 
+        'status', 
+        'teams', 
+        'venue',
+        'tableCaption'
+    ])
+    actual_columns = set(df.columns)
+    missing_columns = expected_columns - actual_columns
+    extra_columns = actual_columns - expected_columns
+    assert missing_columns == set(), f'Missing Columns: {missing_columns}'
+    assert extra_columns == set(), f'Extra Columns: {extra_columns}'
 
-start_date = datetime.strptime(args['START_DATE'], '%Y-%m-%d')
-end_date = datetime.strptime(args['END_DATE'], '%Y-%m-%d')
-source_s3_path = f's3://{args["BUCKET_NAME"]}/football_results_etl'
-output_s3_path = source_s3_path.replace('-raw-', '-transformed-') + f'/weekstarting={start_date.strftime("%Y%m%d")}'
+def nullability_check(df: DataFrame) -> None:
+    non_null_columns = [
+            'date',
+            'id',
+            'teams',
+            'status'
+    ]
+    nulls_check = df.select([col(column_name).isNull().cast('int').alias(column_name) for column_name in non_null_columns]).groupBy().sum()
+    null_counts = nulls_check.collect()[0].asDict()
+    for column, count in null_counts.items():
+        assert count == 0, f'Column {column[4:-1]} cannot have null values'
 
-no_of_days = (end_date - start_date).days + 1
-fixture_dates = [start_date + timedelta(i) for i in range(no_of_days)]
-# Only read partitions for the date interval specified.
-filenames = [f'{source_s3_path}/d={fixture_date.strftime("%Y%m%d")}/results.json' for fixture_date in fixture_dates]
+def type_check(df: DataFrame) -> None:
+    expected_types = {
+        'atVs': 'struct',
+        'attnd': 'string',
+        'competitors': 'array',
+        'date': 'string',
+        'id': 'string',
+        'link': 'string',
+        'status': 'struct',
+        'teams': 'array',
+        'venue': 'struct',
+        'tableCaption': 'string'
+    }
+    for column, actual_type in df.dtypes:
+        if column in expected_types:
+            expected_type = expected_types[column]
+            assert actual_type.startswith(expected_type), f'Column {column} must be {expected_type}, not {actual_type}'
 
-df = spark.read.json(filenames)
-df = df.withColumn('fixture_date', col('date').cast('date'))\
-       .withColumn('attendance', col('attnd').cast('int'))\
+def run_transformations(df: DataFrame) -> DataFrame:
+    df = df.withColumn('fixture_date', col('date').cast('date'))\
+       .withColumn('attendance', regexp_replace('attnd', ',', '').cast('int'))\
        .withColumn('espn_match_id', col('id').cast('int'))\
-       .withColumn('home_team_struct', col('teams').getItem(0))\
-       .withColumn('away_team_struct', col('teams').getItem(1))\
+       .withColumn('home_team_struct', when(size(col('teams')) > 1, col('teams').getItem(0)).otherwise(None))\
+       .withColumn('away_team_struct', when(size(col('teams')) > 1, col('teams').getItem(1)).otherwise(None))\
        .withColumn('home_team', col('home_team_struct')['displayName'])\
        .withColumn('home_team_abbrev', col('home_team_struct')['abbrev'])\
        .withColumn('home_score', col('home_team_struct')['score'])\
@@ -50,7 +88,7 @@ df = df.withColumn('fixture_date', col('date').cast('date'))\
        .withColumn('country', col('venue')['address']['country'])\
        .withColumn('match_status', col('status')['detail'])\
        .withColumn('flag_cancelled', when(col('match_status') == 'Canceled', 1).when(col('match_status') == 'Postponed', 1).otherwise(0))\
-       .withColumn('final_score', when(col('flag_cancelled') == 0, None).otherwise(col('atVs')['atVsText']))\
+       .withColumn('final_score', when(col('flag_cancelled') == 1, "N/A").otherwise(col('atVs')['atVsText']))\
        .select([
            'fixture_date', 
            'attendance', 
@@ -74,6 +112,39 @@ df = df.withColumn('fixture_date', col('date').cast('date'))\
            'match_status',
            'flag_cancelled'
            ])
-df.write.mode('overwrite').parquet(output_s3_path)
+    return df
+
+def write_parquet_to_s3(df: DataFrame, output_s3_path) -> None:
+    df = df.repartition(numPartitions=1)
+    df.write.mode('overwrite').parquet(output_s3_path)
+
+## This is the AWS Glue script which we submit parameters to with the GlueJobOperator in Airflow 
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'BUCKET_NAME', 'START_DATE', 'END_DATE'])
+
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+start_date = datetime.strptime(args['START_DATE'], '%Y-%m-%d')
+end_date = datetime.strptime(args['END_DATE'], '%Y-%m-%d')
+source_s3_path = f's3://{args["BUCKET_NAME"]}/football_results_etl'
+output_s3_path = source_s3_path.replace('-raw-', '-transformed-') + f'/weekstarting={start_date.strftime("%Y%m%d")}'
+
+df = read_json_from_s3(
+    spark,
+    source_s3_path,
+    start_date,
+    end_date
+)
+schema_check(df)
+type_check(df)
+nullability_check(df)
+df = run_transformations(df)
+write_parquet_to_s3(
+    df, 
+    output_s3_path
+)
 
 job.commit()

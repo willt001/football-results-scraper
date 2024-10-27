@@ -8,16 +8,16 @@ from constants import BUCKET_NAME
 import os
 
 @dag(
-    start_date=datetime(2024, 9, 1),
-    schedule_interval='@weekly',
+    start_date=datetime(2024, 9, 2),
+    schedule_interval='0 0 * * 1',
     catchup=False
 )
 def football_results_etl():
 
     @task
     def extract_results(ti=None):
-        start_date = ti.execution_date.date() + timedelta(1)
-        end_date = ti.execution_date.date() + timedelta(7)
+        start_date = ti.execution_date.date()
+        end_date = ti.execution_date.date() + timedelta(6)
         fixture_dates = date_range(start_date, end_date)
         for fixture_date in fixture_dates:
             scrape_results(fixture_date=fixture_date, output_root_path=f'{ti.dag_id}_{ti.execution_date.date()}')
@@ -57,8 +57,8 @@ def football_results_etl():
         region_name='eu-north-1',
         script_args={
             '--BUCKET_NAME': BUCKET_NAME,
-            '--START_DATE': '{{ (execution_date + macros.timedelta(1)).date() }}',
-            '--END_DATE': '{{ (execution_date + macros.timedelta(7)).date() }}',
+            '--START_DATE': '{{ execution_date.date() }}',
+            '--END_DATE': '{{ (execution_date + macros.timedelta(6)).date() }}',
         }
     )
 
