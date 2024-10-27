@@ -61,9 +61,10 @@ select
 from 
     football_results 
 where 
-    weekstarting >= 20241001
+    weekstarting >= 20241008
+    and league_name = 'English Premier League'
 limit 10
 ```
-![image](https://github.com/user-attachments/assets/1ae58618-fc39-4042-9fba-9debc97befd6)
+![image](https://github.com/user-attachments/assets/cefdfc66-9be4-4acc-8f04-1a00bac9883b)
 
 
