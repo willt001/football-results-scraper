@@ -66,30 +66,36 @@ def type_check(df: DataFrame) -> None:
             assert actual_type.startswith(expected_type), f'Column {column} must be {expected_type}, not {actual_type}'
 
 def run_transformations(df: DataFrame) -> DataFrame:
-    df = df.withColumn('fixture_date', col('date').cast('date'))\
-       .withColumn('attendance', regexp_replace('attnd', ',', '').cast('int'))\
-       .withColumn('espn_match_id', col('id').cast('int'))\
-       .withColumn('home_team_struct', when(size(col('teams')) > 1, col('teams').getItem(1)).otherwise(None))\
-       .withColumn('away_team_struct', when(size(col('teams')) > 1, col('teams').getItem(0)).otherwise(None))\
-       .withColumn('home_team', col('home_team_struct')['displayName'])\
-       .withColumn('home_team_abbrev', col('home_team_struct')['abbrev'])\
-       .withColumn('home_score', col('home_team_struct')['score'])\
-       .withColumn('home_team_short', col('home_team_struct')['shortName'])\
-       .withColumn('home_logo', col('home_team_struct')['logo'])\
-       .withColumn('away_team', col('away_team_struct')['displayName'])\
-       .withColumn('away_team_abbrev', col('away_team_struct')['abbrev'])\
-       .withColumn('away_score', col('away_team_struct')['score'])\
-       .withColumn('away_team_short', col('away_team_struct')['shortName'])\
-       .withColumn('away_logo', col('away_team_struct')['logo'])\
-       .withColumn('league_name', col('tableCaption'))\
-       .withColumn('venue_name', col('venue')['fullName'])\
-       .withColumn('venue_id', col('venue')['id'].cast('int'))\
-       .withColumn('city', col('venue')['address']['city'])\
-       .withColumn('country', col('venue')['address']['country'])\
-       .withColumn('match_status', col('status')['detail'])\
-       .withColumn('flag_cancelled', when(col('match_status') == 'Canceled', 1).when(col('match_status') == 'Postponed', 1).otherwise(0))\
-       .withColumn('final_score', when(col('flag_cancelled') == 1, "N/A").otherwise(col('atVs')['atVsText']))\
-       .select([
+    df = df.select(
+            '*',
+            col('date').cast('date').alias('fixture_date'),
+            regexp_replace('attnd', ',', '').cast('int').alias('attendance'),
+            col('id').cast('int').alias('espn_match_id'),
+            col('tableCaption').alias('league_name'),
+            col('venue')['fullName'].alias('venue_name'),
+            col('venue')['id'].cast('int').alias('venue_id'),
+            col('venue')['address']['city'].alias('city'),
+            col('venue')['address']['country'].alias('country'),
+            col('status')['detail'].alias('match_status'),
+            (when(size(col('teams')) > 1, col('teams').getItem(1)).otherwise(None)).alias('home_team_struct'), 
+            (when(size(col('teams')) > 1, col('teams').getItem(0)).otherwise(None)).alias('away_team_struct')
+    )
+    df = df.select(
+            '*',
+            col('home_team_struct')['displayName'].alias('home_team'),
+            col('home_team_struct')['abbrev'].alias('home_team_abbrev'),
+            col('home_team_struct')['score'].alias('home_score'),
+            col('home_team_struct')['shortName'].alias('home_team_short'),
+            col('home_team_struct')['logo'].alias('home_logo'),
+            col('away_team_struct')['displayName'].alias('away_team'),
+            col('away_team_struct')['abbrev'].alias('away_team_abbrev'),
+            col('away_team_struct')['score'].alias('away_score'),
+            col('away_team_struct')['shortName'].alias('away_team_short'),
+            col('away_team_struct')['logo'].alias('away_logo'),
+            (when(col('match_status') == 'Canceled', 1).when(col('match_status') == 'Postponed', 1).otherwise(0)).alias('flag_cancelled')
+        )\
+        .withColumn('final_score', when(col('flag_cancelled') == 1, "N/A").otherwise(col('atVs')['atVsText']))\
+        .select([
            'fixture_date', 
            'attendance', 
            'final_score', 
